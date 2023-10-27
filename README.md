@@ -37,8 +37,6 @@ The hardware is dirt cheap and should be easy to buy and build.
 Here is how the PCB looks:
 ![PassRF](https://github.com/gvrubio/PassRF-Arduino/assets/82053814/751e838e-2f41-40b8-b52c-9649d4af47c7)
 
-And here is the upload:
-
 ## What are some features expected on the future:
 - Reset button to restart the WPA password wizard.
 - Automatic password reset on different client connection.
