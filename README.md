@@ -47,6 +47,13 @@ And here is the upload:
 - Serial CRC32 checksum and json data over serial.
 - Better Web UI, now it just works 😅
 
+## The rest of the repos:
+  Link to the hardware:
+  [LINK](https://github.com/gvrubio/PassRF-Hardware)
+
+  Link to the Arduino code:
+  [LINK](https://github.com/gvrubio/PassRF-Arduino)
+
 ## Which things could make it even more secure:
 
 - SSL between the smartphone and the web server. <- This hasn't been implemented because it would significantly complicate the setup process. I'm open to hearing other ideas.
