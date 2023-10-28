@@ -16,24 +16,58 @@ TODO:
 #include <ESP8266WebServer.h>
 #include <SoftwareSerial.h>
 #include <Preferences.h>
+
+
 String realSize = String(ESP.getFlashChipRealSize());
 String ideSize = String(ESP.getFlashChipSize());
 bool flashCorrectlyConfigured = realSize.equals(ideSize);
 
 //////////////////////////////////////CONSTANTS
-IPAddress apIP(192, 168, 4, 1);
-const char* ssid = "PTYPER";
-String WPAKeyVar = "";
-const int channel = 1;
-const int hidden_ssid = 0;
-const int max_connections = 1;
-const char* prefsNamespace = "wifi_settings";
+const char* setupSsid = "SETUP";                    // SSID Before configuring it
+const char* ssid = "PTYPER";                   // SSID once configured
+String WPAKeyVar = "";                         // INITIAL WPA KEY
+const int channel = 1;                         // WIFI Channel
+const int hidden_ssid = 0;                     // 1 for hidden AP, 2 for unhidden
+const int max_connections = 1;                 // Number of clients allowed. THIS IS ONE OF THE SECURITY FEATURES, keep it like this
+const char* prefsNamespace = "wifi_settings";  // Namespace for the settings
+const int resetPin = D1;                       // Pin for the reset configuration button
+const unsigned long longPressDuration = 5000;  // 5 seconds duration for the reset
+
+//////////////////////////////////////VARIABLES
+unsigned long buttonPressStartTime = 0;  // initial reset button timer.
 
 //////////////////////////////////////OBJECT INITIALIZATION
+IPAddress apIP(192, 168, 4, 1);   // IP address of the AP
 ESP8266WebServer server(80);      // Port 80 for HTTP server
 SoftwareSerial mySerial(D2, D3);  // RX, TX for SoftwareSerial
 
 //////////////////////////////////////FUNCTIONS
+// UTILITY ////////////////////////////////////
+// Reset config
+void handleResetButton() {
+  int buttonStateValue = digitalRead(resetPin);
+  Serial.println(buttonStateValue);
+
+  if (buttonStateValue == LOW) {  // Button is released
+    buttonPressStartTime = millis();
+  } else {  // Button is pressed
+    unsigned long buttonPressDuration = millis() - buttonPressStartTime;
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, LOW);
+    if (buttonPressDuration >= longPressDuration) {
+      digitalWrite(LED_BUILTIN, HIGH);
+      delay(1000);
+      // Handle long press
+      Preferences preferences;
+      preferences.begin(prefsNamespace, false);  // Read-only mode
+      preferences.clear();
+      preferences.end();
+      ESP.restart();
+    }
+  }
+}
+
+// Remove line breaks
 String removeLineBreaks(String inputString) {
   String outputString = "";
 
@@ -48,6 +82,7 @@ String removeLineBreaks(String inputString) {
 
   return outputString;
 }
+
 // RANDOM PASSWORD GENERATOR
 String getRandomPassword() {
   static const char charset[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()_+-=[]{}|;:,.<>?";
@@ -60,7 +95,8 @@ String getRandomPassword() {
 }
 String randomPassword = getRandomPassword();
 
-// FIRST CONNECTION (/)
+// WEB SERVER //////////////////////////////////
+// FIRST CONNECTION ROOT (/)
 void handleFirstConnection() {
   String index_initialization = R"(
 <!DOCTYPE html>
@@ -132,6 +168,7 @@ void handleFirstConnection() {
   index_initialization.replace("%WPAKEY%", String(randomPassword));
   server.send(200, "text/html", index_initialization);
 }
+
 // ROOT (/)
 void handleRoot() {
   String html = R"(
@@ -186,6 +223,7 @@ void handleRoot() {
 )";
   server.send(200, "text/html", html);
 }
+
 // PasswordManager Password (/)
 void handlePassword() {
   String password = server.arg("password");
@@ -216,7 +254,7 @@ void SaveWpa(const String& wifiPassword) {
 // WPAKey Read
 String ReadWpa() {
   Preferences preferences;
-  preferences.begin(prefsNamespace, false);  // Read-only mode
+  preferences.begin(prefsNamespace, true);  // Read-only mode
   String wifiPassword = preferences.getString("password", "");
   preferences.end();
   return wifiPassword;
@@ -234,10 +272,11 @@ void setup() {
   Serial.println("Saved data is:" + WPAKeyVar);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
   if (WPAKeyVar == "") {
-    WiFi.softAP("FIRST", "drivesmenuts", channel, hidden_ssid, max_connections);
+    WiFi.softAP(setupSsid, "", channel, hidden_ssid, max_connections);
   } else {
     WiFi.softAP(ssid, WPAKeyVar, channel, hidden_ssid, max_connections);
   }
+
   // WEB SERVER
   if (WPAKeyVar == "") {
     server.on("/", HTTP_GET, handleFirstConnection);
@@ -253,4 +292,5 @@ void setup() {
 //////////////////////////////////////MAIN LOOP
 void loop() {
   server.handleClient();
+  handleResetButton();
 }
